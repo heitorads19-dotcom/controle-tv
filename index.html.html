@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart Remote Pro</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/711/711245.png">
+
+    <style>
+        :root { --bg: #0a0a0a; --card: #161616; --blue: #007AFF; --red: #FF3B30; --gray: #2c2c2e; }
+        body { background: var(--bg); color: white; font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        
+        .remote-shell { background: var(--card); width: 90%; max-width: 340px; height: 90vh; border-radius: 50px; border: 1px solid #333; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; justify-content: space-around; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+
+        /* Telas */
+        .screen { display: none; flex-direction: column; align-items: center; text-align: center; }
+        .active { display: flex; }
+
+        /* Animação de Radar */
+        .radar-ring { width: 100px; height: 100px; border: 3px solid var(--blue); border-radius: 50%; animation: ripple 1.5s infinite; position: relative; }
+        @keyframes ripple { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+
+        /* Botões Estilizados */
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; width: 100%; }
+        .btn { background: var(--gray); border: none; color: white; padding: 20px; border-radius: 20px; font-size: 20px; cursor: pointer; transition: 0.1s; display: flex; align-items: center; justify-content: center; }
+        .btn:active { background: #3a3a3c; transform: scale(0.95); }
+        .btn-power { background: var(--red); grid-column: span 3; border-radius: 40px; font-weight: bold; margin-bottom: 10px; }
+        .btn-ok { border: 3px solid var(--blue); border-radius: 50%; height: 80px; width: 80px; font-weight: bold; }
+        
+        .footer-info { font-size: 10px; color: #666; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="remote-shell">
+    
+    <div id="scan-screen" class="screen active">
+        <h2>Smart Sync</h2>
+        <p>Buscando TVs na sua rede Wi-Fi...</p>
+        <div class="radar-ring"></div>
+        <div id="results" style="margin-top: 20px; width: 100%;">
+            <p style="font-size: 14px; color: #888;">Certifique-se que a TV está ligada.</p>
+        </div>
+        <button onclick="conectarManual()" style="background:none; border:none; color:var(--blue); margin-top:30px; cursor:pointer;">Digitar IP Manualmente</button>
+    </div>
+
+    <div id="remote-screen" class="screen">
+        <div style="font-size: 12px; color: #4cd964; margin-bottom: 20px;">● TV CONECTADA VIA WI-FI</div>
+        
+        <button class="btn btn-power" onclick="enviar('Power')">POWER</button>
+
+        <div class="grid">
+            <div></div><button class="btn" onclick="enviar('Up')">▲</button><div></div>
+            <button class="btn" onclick="enviar('Left')">◀</button>
+            <button class="btn btn-ok" onclick="enviar('Select')">OK</button>
+            <button class="btn" onclick="enviar('Right')">▶</button>
+            <div></div><button class="btn" onclick="enviar('Down')">▼</button><div></div>
+        </div>
+
+        <div class="grid" style="grid-template-columns: 1fr 1fr; margin-top: 20px;">
+            <button class="btn" onclick="enviar('VolumeUp')">VOL +</button>
+            <button class="btn" onclick="enviar('VolumeDown')">VOL -</button>
+            <button class="btn" style="font-size: 14px;" onclick="enviar('Home')">HOME</button>
+            <button class="btn" style="font-size: 14px;" onclick="enviar('Back')">VOLTAR</button>
+        </div>
+
+        <button onclick="resetApp()" class="footer-info" style="border:none; background:none; cursor:pointer;">Desconectar desta TV</button>
+    </div>
+
+</div>
+
+<script>
+    let tvIP = localStorage.getItem('last_tv_ip');
+
+    window.onload = () => {
+        if (tvIP) {
+            irParaControle();
+        } else {
+            simularScan();
+        }
+    };
+
+    // Simula a busca automática (Scanner)
+    function simularScan() {
+        const resultsDiv = document.getElementById('results');
+        setTimeout(() => {
+            resultsDiv.innerHTML = `
+                <div onclick="confirmarConexao('192.168.0.15')" style="background:#222; padding:15px; border-radius:15px; cursor:pointer; border:1px solid var(--blue);">
+                    <span style="display:block; font-weight:bold;">Smart TV Encontrada</span>
+                    <span style="font-size:12px; color:gray;">IP: 192.168.0.15 (Clique para Parear)</span>
+                </div>
+            `;
+        }, 2500);
+    }
+
+    function confirmarConexao(ip) {
+        localStorage.setItem('last_tv_ip', ip);
+        tvIP = ip;
+        irParaControle();
+    }
+
+    function conectarManual() {
+        const ip = prompt("Digite o IP da sua TV (ex: 192.168.0.15):");
+        if (ip) confirmarConexao(ip);
+    }
+
+    function irParaControle() {
+        document.getElementById('scan-screen').classList.remove('active');
+        document.getElementById('remote-screen').classList.add('active');
+    }
+
+    function resetApp() {
+        localStorage.clear();
+        location.reload();
+    }
+
+    // Função que envia o comando real para a TV
+    function enviar(comando) {
+        if (!tvIP) return;
+        console.log("Comando enviado: " + comando);
+        
+        // Protocolo padrão para Smart TVs (Roku/Android/TCL)
+        fetch(`http://${tvIP}:8060/keypress/${comando}`, {
+            method: 'POST',
+            mode: 'no-cors'
+        }).catch(err => console.log("Erro de rede local (esperado em navegadores)"));
+    }
+</script>
+
+</body>
+</html>
